@@ -1,14 +1,34 @@
 import {chromium, BrowserContext, Page} from "playwright";
+import fs from "fs";
+import {downloadAuthFromS3, uploadAuthToS3} from "./s3";
 
 /**
  * 🔥 메인 실행 함수
  */
 export async function publishToTistory(title: string, content: string) {
     const browser = await chromium.launch({headless: false});
-    const context = await browser.newContext();
+
+    await downloadAuthFromS3();
+    const context = fs.existsSync("auth.json")
+        ? await browser.newContext({storageState: "auth.json"})
+        : await browser.newContext();
+
+
     const page = await context.newPage();
 
-    await login(page, context);
+    await page.goto("https://tistory.com");
+
+    // 4️⃣ 로그인 필요 여부 체크
+    if (page.url().includes("auth/login") || page.url().includes("accounts.kakao.com")) {
+        console.log("세션 만료 → 로그인 진행");
+
+        await login(page, context);
+
+        // 🔥 S3에 업로드
+        await uploadAuthToS3();
+    }
+
+    await page.pause()
     const editorPage = await openEditor(context, page);
 
     await switchToHtmlMode(editorPage);
@@ -30,6 +50,15 @@ async function login(page: Page, context: BrowserContext) {
 
     await page.waitForURL("**tistory.com**", {timeout: 20000});
 
+    await page.waitForLoadState("networkidle");
+
+// 강제로 tistory 도메인 재접근
+    await page.goto("https://www.tistory.com/");
+    await page.waitForLoadState("networkidle");
+
+
+    const cookies = await context.cookies();
+    console.log(cookies.map(c => c.name));
     await context.storageState({path: "auth.json"});
 
     console.log("✅ 로그인 완료");
