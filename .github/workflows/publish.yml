@@ -1,0 +1,40 @@
+name: Tistory Auto Publisher
+
+on:
+  schedule:
+    # KST 기준 12, 15, 18, 20시
+    - cron: '0 3 * * *'   # 12:00 KST
+    - cron: '0 6 * * *'   # 15:00 KST
+    - cron: '0 9 * * *'   # 18:00 KST
+    - cron: '0 11 * * *'  # 20:00 KST
+  workflow_dispatch:      # 수동 실행 가능
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run publisher
+        env:
+          KAKAO_ID: ${{ secrets.KAKAO_ID }}
+          KAKAO_PW: ${{ secrets.KAKAO_PW }}
+          URL_T: ${{ secrets.URL_T }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+        run: npm run publish
