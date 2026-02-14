@@ -6,17 +6,18 @@ import {downloadAuthFromS3, uploadAuthToS3} from "./s3";
  * 🔥 메인 실행 함수
  */
 export async function publishToTistory(title: string, content: string) {
-    const browser = await chromium.launch({headless: false});
+    const browser = await chromium.launch({
+        headless: true, // Actions용
+    });
 
     await downloadAuthFromS3();
     const context = fs.existsSync("auth.json")
         ? await browser.newContext({storageState: "auth.json"})
         : await browser.newContext();
 
-
     const page = await context.newPage();
 
-    await page.goto("https://tistory.com");
+    await page.goto(`${process.env.URL_T}/manage`);
 
     // 4️⃣ 로그인 필요 여부 체크
     if (page.url().includes("auth/login") || page.url().includes("accounts.kakao.com")) {
@@ -28,8 +29,7 @@ export async function publishToTistory(title: string, content: string) {
         await uploadAuthToS3();
     }
 
-    await page.pause()
-    const editorPage = await openEditor(context, page);
+    const editorPage = await openEditor(page);
 
     await switchToHtmlMode(editorPage);
     await writePost(editorPage, title, content);
@@ -53,7 +53,7 @@ async function login(page: Page, context: BrowserContext) {
     await page.waitForLoadState("networkidle");
 
 // 강제로 tistory 도메인 재접근
-    await page.goto("https://www.tistory.com/");
+    await page.goto(`${process.env.URL_T}/manage`);
     await page.waitForLoadState("networkidle");
 
 
@@ -64,30 +64,31 @@ async function login(page: Page, context: BrowserContext) {
     console.log("✅ 로그인 완료");
 }
 
-async function openEditor(context: BrowserContext, page: Page): Promise<Page> {
-    const [newPage] = await Promise.all([
-        context.waitForEvent("page"),
-        page.click('a[href*="newpost"]'),
-    ]);
-
-    await newPage.waitForLoadState("networkidle");
-
-    newPage.on("dialog", async (dialog) => {
-        await dialog.accept();
+async function openEditor(page: Page): Promise<Page> {
+    await page.goto(`${process.env.URL_T}/manage/post`, {
+        waitUntil: "networkidle",
     });
 
-    console.log("✅ 글쓰기 페이지 열림");
+    console.log("✅ 글쓰기 페이지 직접 이동 완료");
 
-    return newPage;
+    return page;
 }
 
 async function switchToHtmlMode(page: Page) {
-    await page.waitForSelector("#editor-mode-layer-btn-open", {
-        state: "visible",
-        timeout: 30000,
+    page.once("dialog", async (dialog) => {
+        console.log("dialog 발생:", dialog.message());
+        await dialog.accept(); // 확인 클릭
     });
 
-    await page.click("#editor-mode-layer-btn-open");
+    const button = page.locator("#editor-mode-layer-btn-open");
+
+    await button.waitFor({state: "visible"});
+    console.log("버튼 visible 확인");
+
+    await button.click();
+    console.log("버튼 click 실행");
+
+
     await page.waitForSelector("#editor-mode-html");
     await page.click("#editor-mode-html");
 
@@ -111,7 +112,7 @@ async function writePost(page: Page, title: string, content: string) {
     const editor = page.locator(".cm-s-tistory-html").first();
 
     await editor.click();
-    await page.keyboard.press("Meta+A");
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
     await page.keyboard.press("Backspace");
     await page.keyboard.type(content, {delay: 5});
 
@@ -142,7 +143,6 @@ async function publishWithReservation(page: Page) {
     await page.fill("#dateHour", hour);
     await page.fill("#dateMinute", minute);
 
-    await page.pause()
 
     // 발행
     await page.click("#publish-btn");
