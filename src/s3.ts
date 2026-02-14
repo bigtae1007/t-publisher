@@ -15,6 +15,8 @@ const key = process.env.S3_AUTH_KEY!;
 
 // 🔹 S3에서 auth.json 다운로드
 export async function downloadAuthFromS3() {
+    console.log("Bucket:", bucket);
+    console.log("Key:", key);
     try {
         const command = new GetObjectCommand({
             Bucket: bucket,
@@ -46,7 +48,8 @@ export async function downloadAuthFromS3() {
 // 🔹 auth.json 업로드
 export async function uploadAuthToS3() {
     const file = fs.readFileSync("auth.json");
-
+    console.log("Upload Bucket:", bucket);
+    console.log("Upload Key:", key);
     const command = new PutObjectCommand({
         Bucket: bucket,
         Key: key,
