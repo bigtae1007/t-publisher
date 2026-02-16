@@ -41,4 +41,5 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           S3_AUTH_KEY: ${{ secrets.S3_AUTH_KEY }}
+          SERVER_URI: ${{ secrets.SERVER_URI }}
         run: npm run batch

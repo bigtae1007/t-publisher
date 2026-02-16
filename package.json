@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node src/server.ts",
+    "dev:p": "ts-node src/publishBatch.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "batch": "node dist/publishBatch.js"

@@ -4,12 +4,18 @@ dotenv.config();
 
 import {publishToTistory} from "./publisher";
 
+interface Response {
+    data : {
+        title : string;
+        content : string
+        tags : string[]
+    }
+}
 async function run() {
     try {
-        const title = process.env.BATCH_TITLE || "테스트 제목";
-        const content = process.env.BATCH_CONTENT || "<h1>Hello</h1>";
-
-        await publishToTistory(title, content);
+        const response = await fetch(process.env.SERVER_URI!);
+        const data : Response = await response.json()
+        await publishToTistory(data.data.title, data.data.content,data.data.tags);
 
         console.log("배치 실행 완료");
         process.exit(0);

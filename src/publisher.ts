@@ -5,7 +5,7 @@ import {downloadAuthFromS3, uploadAuthToS3} from "./s3";
 /**
  * 🔥 메인 실행 함수
  */
-export async function publishToTistory(title: string, content: string) {
+export async function publishToTistory(title: string, content: string, tags: string[] = []) {
     const browser = await chromium.launch({
         headless: true, // Actions용
     });
@@ -32,7 +32,7 @@ export async function publishToTistory(title: string, content: string) {
     const editorPage = await openEditor(page);
 
     await switchToHtmlMode(editorPage);
-    await writePost(editorPage, title, content);
+    await writePost(editorPage, title, content, tags);
     await publishWithReservation(editorPage);
     await browser.close();
 }
@@ -97,12 +97,12 @@ async function switchToHtmlMode(page: Page) {
     console.log("✅ HTML 모드 전환 완료");
 }
 
-async function writePost(page: Page, title: string, content: string) {
+async function writePost(page: Page, title: string, content: string, tags: string[] = []) {
     // 제목
     await page.fill("#post-title-inp", title);
 
     // 태그
-    const tagString = ["playwright", "자동화", "티스토리"].join(", ");
+    const tagString = tags.join(", ");
     await page.fill("#tagText", tagString);
     await page.keyboard.press("Enter");
 
