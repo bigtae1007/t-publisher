@@ -12,10 +12,10 @@ app.get("/", (req, res) => {
 });
 
 app.post("/publish", async (req, res) => {
-    const {title, content} = req.body;
+    const {title, content, tags, category} = req.body;
 
     try {
-        await publishToTistory(title, content);
+        await publishToTistory(title, content, tags ?? [], category);
         res.json({success: true});
     } catch (error) {
         console.error(error);

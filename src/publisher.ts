@@ -7,7 +7,12 @@ const DEBUG_DIR = "debug-artifacts";
 /**
  * 🔥 메인 실행 함수
  */
-export async function publishToTistory(title: string, content: string, tags: string[] = []) {
+export async function publishToTistory(
+    title: string,
+    content: string,
+    tags: string[] = [],
+    category?: number | string | null
+) {
     const browser = await chromium.launch({
         headless: true, // Actions용
     });
@@ -37,6 +42,7 @@ export async function publishToTistory(title: string, content: string, tags: str
     const editorPage = await openEditor(page);
 
     await switchToHtmlMode(editorPage);
+    await selectedCategory(editorPage, category);
     await writePost(editorPage, title, content, tags);
     await publishWithReservation(editorPage);
     await browser.close();
@@ -111,6 +117,45 @@ async function switchToHtmlMode(page: Page) {
     } catch (error) {
         await dumpDebugArtifacts(page, "switchToHtmlMode");
         throw error;
+    }
+}
+
+async function selectedCategory(page: Page, category?: number | string | null) {
+    if (category === undefined || category === null || category === "") {
+        console.log("[debug] category 없음 → 카테고리 선택 스킵");
+        return;
+    }
+
+    const categoryId = String(category).trim();
+    const categoryButton = page.locator("#category-btn").first();
+
+    if (await categoryButton.count() === 0) {
+        console.log("[debug] #category-btn 없음 → 카테고리 선택 스킵");
+        return;
+    }
+
+    await categoryButton.click();
+    await page.waitForTimeout(200);
+
+    const targetOption = page
+        .locator(`#category-item-${categoryId}, [category-id="${categoryId}"]`)
+        .first();
+
+    if (await targetOption.count() === 0) {
+        console.log(`[debug] category-id=${categoryId} 항목 없음 → 스킵`);
+        const expanded = await categoryButton.getAttribute("aria-expanded");
+        if (expanded === "true") {
+            await categoryButton.click();
+        }
+        return;
+    }
+
+    await targetOption.click();
+    console.log(`[debug] category-id=${categoryId} 선택 완료`);
+
+    const expandedAfterSelect = await categoryButton.getAttribute("aria-expanded");
+    if (expandedAfterSelect === "true") {
+        await categoryButton.click();
     }
 }
 

@@ -11,6 +11,7 @@ interface NextBlogResponse {
         title : string;
         content : string;
         tags : string[];
+        category?: number | string | null;
     } | null;
     error: unknown;
 }
@@ -69,7 +70,7 @@ async function run() {
         const nextBlog = await fetchNextBlog(baseUrl);
 
         console.log(`${nextBlog.title} 업로드 시작`)
-        await publishToTistory(nextBlog.title, nextBlog.content, nextBlog.tags);
+        await publishToTistory(nextBlog.title, nextBlog.content, nextBlog.tags, nextBlog.category);
         console.log(`${nextBlog.title} 업로드 완료 처리 중 ~`)
         await markBlogDone(baseUrl, nextBlog.id);
 
