@@ -21,6 +21,7 @@ export async function publishToTistory(title: string, content: string, tags: str
 
     await page.goto(`${process.env.URL_T}/manage`);
     console.log("[debug] /manage 이동 후 URL:", page.url());
+    await dumpDebugArtifacts(page, "01-after-manage");
 
     // 4️⃣ 로그인 필요 여부 체크
     if (page.url().includes("auth/login") || page.url().includes("accounts.kakao.com")) {
@@ -42,22 +43,27 @@ export async function publishToTistory(title: string, content: string, tags: str
 
 async function login(page: Page, context: BrowserContext) {
     await page.goto("https://www.tistory.com/auth/login");
+    await dumpDebugArtifacts(page, "02-login-page");
 
     await page.click(".link_kakao_id");
     await page.waitForURL("**accounts.kakao.com**");
+    await dumpDebugArtifacts(page, "03-kakao-login-page");
 
     await page.fill('input[name="loginId"]', process.env.KAKAO_ID!);
     await page.fill('input[name="password"]', process.env.KAKAO_PW!);
 
     await page.click("button.submit");
+    await dumpDebugArtifacts(page, "04-after-submit");
 
     await page.waitForURL("**tistory.com**", {timeout: 20000});
 
     await page.waitForLoadState("networkidle");
+    await dumpDebugArtifacts(page, "05-after-return-tistory");
 
 // 강제로 tistory 도메인 재접근
     await page.goto(`${process.env.URL_T}/manage`);
     await page.waitForLoadState("networkidle");
+    await dumpDebugArtifacts(page, "06-after-manage-revisit");
 
 
     const cookies = await context.cookies();
@@ -74,6 +80,7 @@ async function openEditor(page: Page): Promise<Page> {
 
     console.log("✅ 글쓰기 페이지 직접 이동 완료");
     console.log("[debug] editor page URL:", page.url());
+    await dumpDebugArtifacts(page, "07-after-manage-post");
 
     return page;
 }
@@ -87,6 +94,7 @@ async function switchToHtmlMode(page: Page) {
     const button = page.locator("#editor-mode-layer-btn-open");
 
     try {
+        await dumpDebugArtifacts(page, "08-before-html-mode");
         await button.waitFor({state: "visible", timeout: 20000});
         console.log("버튼 visible 확인");
 
@@ -97,6 +105,7 @@ async function switchToHtmlMode(page: Page) {
         await page.click("#editor-mode-html");
 
         await page.waitForLoadState("networkidle");
+        await dumpDebugArtifacts(page, "09-after-html-mode");
 
         console.log("✅ HTML 모드 전환 완료");
     } catch (error) {
@@ -192,27 +201,31 @@ function getRandomReservationTime() {
 }
 
 async function dumpDebugArtifacts(page: Page, stage: string) {
-    if (!fs.existsSync(DEBUG_DIR)) {
-        fs.mkdirSync(DEBUG_DIR, {recursive: true});
+    try {
+        if (!fs.existsSync(DEBUG_DIR)) {
+            fs.mkdirSync(DEBUG_DIR, {recursive: true});
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const prefix = `${DEBUG_DIR}/${stage}-${timestamp}`;
+
+        console.log(`[debug] stage=${stage}`);
+        console.log("[debug] current URL:", page.url());
+        console.log("[debug] page title:", await page.title());
+        console.log("[debug] readyState:", await page.evaluate(() => document.readyState));
+        console.log(
+            "[debug] selector counts:",
+            await page.locator("#editor-mode-layer-btn-open").count(),
+            await page.locator("#editor-mode-html").count(),
+            await page.locator("#post-title-inp").count()
+        );
+
+        await page.screenshot({path: `${prefix}.png`, fullPage: true});
+        fs.writeFileSync(`${prefix}.html`, await page.content(), "utf-8");
+
+        console.log(`[debug] screenshot: ${prefix}.png`);
+        console.log(`[debug] html dump: ${prefix}.html`);
+    } catch (err) {
+        console.error(`[debug] artifact dump failed at ${stage}:`, err);
     }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const prefix = `${DEBUG_DIR}/${stage}-${timestamp}`;
-
-    console.log(`[debug] stage=${stage}`);
-    console.log("[debug] current URL:", page.url());
-    console.log("[debug] page title:", await page.title());
-    console.log("[debug] readyState:", await page.evaluate(() => document.readyState));
-    console.log(
-        "[debug] selector counts:",
-        await page.locator("#editor-mode-layer-btn-open").count(),
-        await page.locator("#editor-mode-html").count(),
-        await page.locator("#post-title-inp").count()
-    );
-
-    await page.screenshot({path: `${prefix}.png`, fullPage: true});
-    fs.writeFileSync(`${prefix}.html`, await page.content(), "utf-8");
-
-    console.log(`[debug] screenshot: ${prefix}.png`);
-    console.log(`[debug] html dump: ${prefix}.html`);
 }
