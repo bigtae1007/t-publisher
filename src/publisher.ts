@@ -2,6 +2,8 @@ import {chromium, BrowserContext, Page} from "playwright";
 import fs from "fs";
 import {downloadAuthFromS3, uploadAuthToS3} from "./s3";
 
+const DEBUG_DIR = "debug-artifacts";
+
 /**
  * 🔥 메인 실행 함수
  */
@@ -18,6 +20,7 @@ export async function publishToTistory(title: string, content: string, tags: str
     const page = await context.newPage();
 
     await page.goto(`${process.env.URL_T}/manage`);
+    console.log("[debug] /manage 이동 후 URL:", page.url());
 
     // 4️⃣ 로그인 필요 여부 체크
     if (page.url().includes("auth/login") || page.url().includes("accounts.kakao.com")) {
@@ -70,6 +73,7 @@ async function openEditor(page: Page): Promise<Page> {
     });
 
     console.log("✅ 글쓰기 페이지 직접 이동 완료");
+    console.log("[debug] editor page URL:", page.url());
 
     return page;
 }
@@ -82,19 +86,23 @@ async function switchToHtmlMode(page: Page) {
 
     const button = page.locator("#editor-mode-layer-btn-open");
 
-    await button.waitFor({state: "visible"});
-    console.log("버튼 visible 확인");
+    try {
+        await button.waitFor({state: "visible", timeout: 20000});
+        console.log("버튼 visible 확인");
 
-    await button.click();
-    console.log("버튼 click 실행");
+        await button.click();
+        console.log("버튼 click 실행");
 
+        await page.waitForSelector("#editor-mode-html", {timeout: 20000});
+        await page.click("#editor-mode-html");
 
-    await page.waitForSelector("#editor-mode-html");
-    await page.click("#editor-mode-html");
+        await page.waitForLoadState("networkidle");
 
-    await page.waitForLoadState("networkidle");
-
-    console.log("✅ HTML 모드 전환 완료");
+        console.log("✅ HTML 모드 전환 완료");
+    } catch (error) {
+        await dumpDebugArtifacts(page, "switchToHtmlMode");
+        throw error;
+    }
 }
 
 async function writePost(page: Page, title: string, content: string, tags: string[] = []) {
@@ -181,4 +189,30 @@ function getRandomReservationTime() {
         hour,
         minute,
     };
+}
+
+async function dumpDebugArtifacts(page: Page, stage: string) {
+    if (!fs.existsSync(DEBUG_DIR)) {
+        fs.mkdirSync(DEBUG_DIR, {recursive: true});
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const prefix = `${DEBUG_DIR}/${stage}-${timestamp}`;
+
+    console.log(`[debug] stage=${stage}`);
+    console.log("[debug] current URL:", page.url());
+    console.log("[debug] page title:", await page.title());
+    console.log("[debug] readyState:", await page.evaluate(() => document.readyState));
+    console.log(
+        "[debug] selector counts:",
+        await page.locator("#editor-mode-layer-btn-open").count(),
+        await page.locator("#editor-mode-html").count(),
+        await page.locator("#post-title-inp").count()
+    );
+
+    await page.screenshot({path: `${prefix}.png`, fullPage: true});
+    fs.writeFileSync(`${prefix}.html`, await page.content(), "utf-8");
+
+    console.log(`[debug] screenshot: ${prefix}.png`);
+    console.log(`[debug] html dump: ${prefix}.html`);
 }
