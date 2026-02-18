@@ -28,9 +28,10 @@ export async function publishToTistory(title: string, content: string, tags: str
         console.log("세션 만료 → 로그인 진행");
 
         await login(page, context);
-
-        // 🔥 S3에 업로드
-        await uploadAuthToS3();
+        await persistAuthToS3(context, "after-login");
+    } else {
+        // 기존 auth.json으로 로그인된 경우에도 최신 세션으로 갱신 저장
+        await persistAuthToS3(context, "reuse-session");
     }
 
     const editorPage = await openEditor(page);
@@ -68,7 +69,6 @@ async function login(page: Page, context: BrowserContext) {
 
     const cookies = await context.cookies();
     console.log(cookies.map(c => c.name));
-    await context.storageState({path: "auth.json"});
 
     console.log("✅ 로그인 완료");
 }
@@ -228,4 +228,10 @@ async function dumpDebugArtifacts(page: Page, stage: string) {
     } catch (err) {
         console.error(`[debug] artifact dump failed at ${stage}:`, err);
     }
+}
+
+async function persistAuthToS3(context: BrowserContext, reason: string) {
+    await context.storageState({path: "auth.json"});
+    console.log(`[debug] auth.json 저장 완료 (${reason})`);
+    await uploadAuthToS3();
 }
