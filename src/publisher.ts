@@ -4,6 +4,11 @@ import {downloadAuthFromS3, uploadAuthToS3} from "./s3";
 
 const DEBUG_DIR = "debug-artifacts";
 
+export interface ReservationTime {
+    hour: string;
+    minute: string;
+}
+
 /**
  * 🔥 메인 실행 함수
  */
@@ -11,16 +16,22 @@ export async function publishToTistory(
     title: string,
     content: string,
     tags: string[] = [],
-    category?: number | string | null
+    category?: number | string | null,
+    reservationTime?: ReservationTime
 ) {
     const browser = await chromium.launch({
         headless: true, // Actions용
     });
 
     await downloadAuthFromS3();
+    const contextOptions = {
+        timezoneId: "Asia/Seoul",
+        locale: "ko-KR",
+    } as const;
+
     const context = fs.existsSync("auth.json")
-        ? await browser.newContext({storageState: "auth.json"})
-        : await browser.newContext();
+        ? await browser.newContext({...contextOptions, storageState: "auth.json"})
+        : await browser.newContext(contextOptions);
 
     const page = await context.newPage();
 
@@ -44,7 +55,7 @@ export async function publishToTistory(
     await switchToHtmlMode(editorPage);
     await selectedCategory(editorPage, category);
     await writePost(editorPage, title, content, tags);
-    await publishWithReservation(editorPage);
+    await publishWithReservation(editorPage, reservationTime);
     await browser.close();
 }
 
@@ -181,7 +192,7 @@ async function writePost(page: Page, title: string, content: string, tags: strin
     console.log("✅ 글 작성 완료");
 }
 
-async function publishWithReservation(page: Page) {
+async function publishWithReservation(page: Page, reservationTime?: ReservationTime) {
     await page.click("#publish-layer-btn");
 
     await page.waitForSelector('button:has-text("예약")');
@@ -197,13 +208,11 @@ async function publishWithReservation(page: Page) {
     //
     // await page.locator(".btn_day", {hasText: day}).first().click();
 
-    const {date, hour, minute} = getRandomReservationTime();
-    console.log(date, hour, minute)
+    const selectedTime = reservationTime ?? getRandomReservationTime();
+    console.log("예약 시간:", `${selectedTime.hour}:${selectedTime.minute}`);
 
-    console.log("예약 시간:", date);
-
-    await page.fill("#dateHour", hour);
-    await page.fill("#dateMinute", minute);
+    await page.fill("#dateHour", selectedTime.hour);
+    await page.fill("#dateMinute", selectedTime.minute);
 
 
     // 발행

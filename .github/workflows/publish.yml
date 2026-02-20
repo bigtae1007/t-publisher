@@ -2,11 +2,9 @@ name: Tistory Auto Publisher
 
 on:
   schedule:
-    # KST 기준 12, 15, 18, 20시
-    - cron: '0 3 * * *'   # 12:00 KST
-    - cron: '0 6 * * *'   # 15:00 KST
-    - cron: '0 9 * * *'   # 18:00 KST
-    - cron: '0 11 * * *'  # 20:00 KST
+    # KST 기준 13:00, 19:00 (UTC cron)
+    - cron: '0 4 * * *'   # 13:00 KST
+    - cron: '0 10 * * *'  # 19:00 KST
   workflow_dispatch:      # 수동 실행 가능
 
 jobs:
@@ -33,6 +31,7 @@ jobs:
 
       - name: Run publisher
         env:
+          TZ: Asia/Seoul
           KAKAO_ID: ${{ secrets.KAKAO_ID }}
           KAKAO_PW: ${{ secrets.KAKAO_PW }}
           URL_T: ${{ secrets.URL_T }}
@@ -42,6 +41,8 @@ jobs:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           S3_AUTH_KEY: ${{ secrets.S3_AUTH_KEY }}
           SERVER_URI: ${{ secrets.SERVER_URI }}
+          PUBLISH_COUNT: "2"
+          RESERVE_OFFSETS_MINUTES: "35,119"
         run: npm run batch
 
       - name: Upload debug artifacts
